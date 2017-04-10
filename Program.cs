@@ -35,7 +35,7 @@ namespace MassTransSaga
         public static void Main(string[] args)
         {
             var builder = new ContainerBuilder();
-            builder.RegisterType<TheGreatSaga>().AsSelf();
+            builder.RegisterType<TheGreatSaga>().AsSelf().SingleInstance();
 
             builder.Register(
                     context =>
@@ -43,7 +43,7 @@ namespace MassTransSaga
                             SagaDbContextFactory factory = () => new TheGreatSagaDbContext();
                             return new EntityFrameworkSagaRepository<TheGreatState>(factory, optimistic: true);
                         }).As<ISagaRepository<TheGreatState>>()
-                .InstancePerLifetimeScope();
+                .SingleInstance();
             
             builder.Register(
                 context =>
@@ -66,6 +66,12 @@ namespace MassTransSaga
                                         epc =>
                                             {
                                                 epc.UseInMemoryOutbox();
+                                                epc.UseRetry(
+                                                    x =>
+                                                        {
+                                                            x.Handle<DbUpdateConcurrencyException>();
+                                                            x.Interval(5, TimeSpan.FromMilliseconds(100));
+                                                        }); // Add Retry Middleware for Optimistic Concurrency
 
                                                 var repository = context.Resolve<ISagaRepository<TheGreatState>>();
                                                 var saga = context.Resolve<TheGreatSaga>();
@@ -85,12 +91,7 @@ namespace MassTransSaga
                                                                     c => c.Message.EventId));
                                                         });
 
-                                                epc.UseRetry(
-                                                    x =>
-                                                        {
-                                                            x.Handle<DbUpdateConcurrencyException>();
-                                                            x.Interval(5, TimeSpan.FromMilliseconds(100));
-                                                        }); // Add Retry Middleware for Optimistic Concurrency
+                                               
                                             });
 
                                 });
