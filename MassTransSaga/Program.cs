@@ -15,6 +15,8 @@ namespace MassTransSaga
     using Automatonymous;
 
     using GreenPipes;
+    using GreenPipes.Partitioning;
+    using GreenPipes.Specifications;
 
     using MassTransit;
     using MassTransit.EntityFrameworkIntegration;
@@ -79,6 +81,7 @@ namespace MassTransSaga
                                                             x.Interval(5, TimeSpan.FromMilliseconds(100));
                                                         }); // Add Retry Middleware for Optimistic Concurrency
 
+
                                                 var repository = context.Resolve<ISagaRepository<TheGreatState>>();
                                                 var saga = context.Resolve<TheGreatSaga>();
 
@@ -86,16 +89,13 @@ namespace MassTransSaga
                                                 epc.PrefetchCount = (ushort)(concurrency * 2);
 
                                                 var partitioner = epc.CreatePartitioner(concurrency);
-                                                epc.StateMachineSaga(
-                                                    saga,
-                                                    repository,
-                                                    sc =>
-                                                        {
-                                                            sc.Message<IUpdateGreatState>(
-                                                                m => m.UsePartitioner(
-                                                                    partitioner,
-                                                                    c => c.Message.EventId));
-                                                        });
+
+                                                PartitionKeyProvider<ConsumeContext<IUpdateGreatState>> provider = c => c.Message.EventId.ToByteArray();
+                                                var partitionerUpdateGreatStateSpecification = new PartitionerPipeSpecification<ConsumeContext<IUpdateGreatState>>(provider, partitioner);
+
+                                                epc.AddPipeSpecification(partitionerUpdateGreatStateSpecification);
+
+                                                epc.StateMachineSaga(saga, repository);
                                             });
 
                                 });
