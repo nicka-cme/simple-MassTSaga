@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 namespace MassTransSaga
 {
     using System.Data.Entity.Infrastructure;
+    using System.IO;
     using System.Threading;
 
     using Autofac;
@@ -34,6 +35,11 @@ namespace MassTransSaga
     {
         public static void Main(string[] args)
         {
+            var path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "data");
+            if (!Directory.Exists(path))
+                Directory.CreateDirectory(path);
+            AppDomain.CurrentDomain.SetData("DataDirectory", path);
+
             var builder = new ContainerBuilder();
             builder.RegisterType<TheGreatSaga>().AsSelf().SingleInstance();
 
@@ -90,8 +96,6 @@ namespace MassTransSaga
                                                                     partitioner,
                                                                     c => c.Message.EventId));
                                                         });
-
-                                               
                                             });
 
                                 });
