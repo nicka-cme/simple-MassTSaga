@@ -88,12 +88,15 @@ namespace MassTransSaga
                                                 ushort concurrency = 8;
                                                 epc.PrefetchCount = (ushort)(concurrency * 2);
 
-                                                var partitioner = epc.CreatePartitioner(concurrency);
+                                                epc.UsePartitioner(
+                                                    concurrency,
+                                                    cc =>
+                                                        {
+                                                            if (cc.TryGetMessage(out ConsumeContext<IUpdateGreatState> createSagaContext))
+                                                                return createSagaContext.Message.EventId;
 
-                                                PartitionKeyProvider<ConsumeContext<IUpdateGreatState>> provider = c => c.Message.EventId.ToByteArray();
-                                                var partitionerUpdateGreatStateSpecification = new PartitionerPipeSpecification<ConsumeContext<IUpdateGreatState>>(provider, partitioner);
-
-                                                epc.AddPipeSpecification(partitionerUpdateGreatStateSpecification);
+                                                            return cc.CorrelationId ?? Guid.Empty;
+                                                        });
 
                                                 epc.StateMachineSaga(saga, repository);
                                             });
